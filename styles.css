@@ -1,0 +1,72 @@
+:root { font-family: Arial, Helvetica, sans-serif; font-size: 18px; color: #1d2935; background: #f4f7f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #165b88; outline-offset: 2px; }
+.site-header { background: white; border-bottom: 1px solid #cdd8dd; padding: 14px max(18px, calc((100% - 950px)/2)); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; }
+.brand { font-size: 1.55rem; color: #126a70; display: block; }
+.caption { font-size: .78rem; color: #475964; display: block; }
+.role-control { display: flex; gap: 4px; padding: 4px; border: 1px solid #cbd7de; border-radius: 12px; background: #f3f6f8; }
+.role-control button { border: 0; background: none; color: #233e4d; padding: 10px 12px; border-radius: 9px; font-size: .84rem; }
+.role-control button.selected { background: #165e67; color: white; font-weight: bold; }
+.app { max-width: 800px; margin: 24px auto; padding: 0 18px; min-height: 69vh; }
+h1 { font-size: 1.7rem; line-height: 1.2; margin: 10px 0; }
+h2 { font-size: 1.28rem; margin: 0 0 13px; }
+h3 { font-size: 1rem; margin: 0 0 8px; }
+p { line-height: 1.45; margin: 8px 0 14px; }
+.muted { color: #50616b; }
+.small { font-size: .85rem; }
+.card { background: white; border: 1px solid #cdd9df; border-radius: 14px; padding: 22px; margin: 16px 0; box-shadow: 0 3px 10px rgba(26,49,65,.04); }
+.medication { display: flex; gap: 20px; align-items: center; margin: 19px 0; }
+.bottle { width: 105px; min-width: 105px; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.bottle .lid { width: 58px; height: 20px; background: #556674; border-radius: 6px 6px 2px 2px; border: 2px solid #374955; }
+.bottle .body { height: 106px; width: 83px; border: 3px solid #865c34; border-radius: 9px 9px 14px 14px; background: #dca459; display: flex; align-items: center; justify-content: center; padding: 6px; }
+.bottle .label { display: flex; min-height: 60px; width: 100%; background: #e8f7f4; border: 2px solid #17746e; color: #164f4d; border-radius: 3px; align-items: center; justify-content: center; text-align: center; padding: 4px; font-size: .75rem; font-weight: bold; overflow-wrap: anywhere; }
+.med-info { flex: 1; }
+.med-name { font-size: 1.35rem; font-weight: bold; margin-bottom: 4px; }
+.dose { margin: 4px 0; }
+.status { font-size: .78rem; font-weight: bold; padding: 5px 9px; border-radius: 6px; border: 1px solid #adc0c9; background: #edf3f5; display: inline-block; }
+.status.taken { background: #def5e9; color: #145638; border-color: #a6d8bc; }
+.status.due { background: #fff1d6; color: #774a04; border-color: #f2d18e; }
+.status.unconfirmed { background: #fff0ee; color: #8d271e; border-color: #e8b0a8; }
+.status.later { background: #e9eafc; color: #383b86; border-color: #bac1ed; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.btn { border: 2px solid #b4c7d0; border-radius: 10px; padding: 13px 17px; min-height: 50px; background: white; color: #173b50; font-weight: bold; }
+.btn.primary { background: #126a70; border-color: #126a70; color: white; }
+.btn.danger { border-color: #a72a28; color: #91221f; }
+.btn.small-btn { min-height: 39px; padding: 7px 11px; font-size: .85rem; }
+.btn:disabled { opacity: .55; cursor: default; }
+.notice { border-left: 5px solid #19687c; background: #eaf5f7; padding: 13px 16px; border-radius: 6px; margin: 13px 0; }
+.notice.warning { border-color: #a42c26; background: #fff0ee; color: #7d1d1b; }
+.notice.success { border-color: #247948; background: #e6f6ec; }
+.row { display: flex; gap: 12px; align-items: center; justify-content: space-between; border-top: 1px solid #e2e9ed; padding: 14px 0; flex-wrap: wrap; }
+.row:first-of-type { border-top: 0; }
+.row-title { font-weight: bold; }
+.row-meta { color: #50616b; font-size: .85rem; margin-top: 5px; }
+.row-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.form-grid { display: grid; gap: 13px; }
+label.field { display: block; font-weight: bold; }
+label.field input, label.field textarea { display: block; margin-top: 6px; width: 100%; min-height: 45px; padding: 10px; border: 1px solid #8ea4b1; border-radius: 7px; background: white; color: #16262f; font-weight: normal; }
+label.field textarea { min-height: 72px; resize: vertical; }
+.divider { height: 1px; background: #e0e7e9; margin: 20px 0; }
+.bottle-choice { display: flex; flex-wrap: wrap; gap: 10px; }
+.bottle-choice .btn { flex: 1; min-width: 180px; }
+.counts { display: flex; gap: 10px; flex-wrap: wrap; }
+.count { background: white; flex: 1; min-width: 130px; padding: 15px; border-radius: 10px; border: 1px solid #cdd9df; }
+.count strong { display: block; font-size: 1.7rem; }
+.footer { max-width: 850px; margin: 20px auto; padding: 14px 18px 30px; color: #556672; font-size: .77rem; text-align: center; }
+.link-button { background: none; border: none; text-decoration: underline; color: #125667; padding: 0 3px; font-size: inherit; }
+@media (max-width: 540px) {
+  .site-header { padding: 13px 16px; }
+  .role-control { width: 100%; }
+  .role-control button { flex: 1; }
+  .app { margin-top: 16px; }
+  .card { padding: 16px; }
+  .bottle { width: 77px; min-width: 77px; height: 115px; }
+  .bottle .lid { width: 46px; }
+  .bottle .body { width: 70px; height: 88px; }
+  .medication { gap: 12px; }
+  .med-name { font-size: 1.15rem; }
+  .actions .btn { width: 100%; }
+}

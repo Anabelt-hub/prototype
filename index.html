@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareNest — Medication Reminder Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div><strong class="brand">CareNest</strong><span class="caption">Medication reminder prototype</span></div>
+    <div class="role-control" aria-label="Choose prototype view">
+      <button type="button" id="user-role" class="selected" aria-pressed="true">Medication user</button>
+      <button type="button" id="caregiver-role" aria-pressed="false">Caregiver</button>
+    </div>
+  </header>
+  <main id="app" class="app" aria-live="off"></main>
+  <footer class="footer">Class project only. All medications and scans are simulated. Do not use for real medication decisions. <button id="reset" type="button" class="link-button">Reset demo</button></footer>
+</body>
+</html>
