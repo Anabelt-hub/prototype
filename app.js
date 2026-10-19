@@ -1,4 +1,3 @@
-// CareNest: simplified, local-only classroom prototype. Not a medical tool.
 (() => {
   const KEY = 'carenest-simple-v1';
   const example = () => ({
