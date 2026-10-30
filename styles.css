@@ -70,3 +70,13 @@ label.field textarea { min-height: 72px; resize: vertical; }
   .med-name { font-size: 1.15rem; }
   .actions .btn { width: 100%; }
 }
+.help-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.btn.help-btn {
+  text-align: left;
+  min-height: 64px;
+  font-size: 1.05rem;
+}
