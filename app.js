@@ -1,6 +1,9 @@
     (() => {
       const KEY = 'carenest-simple-v1';
-     
+      const ACCOUNTS = { 
+	alex: {password: "test123", role: "user"},
+	caregiver: {password: "test123", role: "caregiver"}
+      };
         const example = () => ({
             medicines: [
                 {
@@ -36,7 +39,7 @@
           data = example();
       }
  
-        let role = 'user';
+        let role = sessionStorage.getItem('carenest-role');
         let checking = null;
         let helping = null;
         let editing = null;
@@ -106,13 +109,34 @@
         };
 
         function render() {
-            document.getElementById('user-role').classList.toggle('selected', role === 'user');
-            document.getElementById('caregiver-role').classList.toggle('selected', role === 'caregiver');
-            document.getElementById('user-role').setAttribute('aria-pressed', role === 'user');
-            document.getElementById('caregiver-role').setAttribute('aria-pressed', role === 'caregiver');
-            const notice = message ? `<div class="notice" role="status">${escapeHTML(message)}</div>` : '';
-            app.innerHTML = notice + (role === 'user' ? userView() : caregiverView());
-        }
+	    const notice = message ? `<div class="notice" role="status">${escapeHTML(message)}</div>` : '';
+	    if (!role) {
+	      document.getElementById('reset').hidden = true;
+	      app.innerHTML = notice + loginView();
+	      return;
+	    }
+            document.getElementById('reset').hidden = role !== 'caregiver';
+	    const logout = `<div class="actions">${button('Log out', 'logout')}</div>`;
+            app.innerHTML = notice + logout + (role === 'user' ? userView() : caregiverView());
+	}
+
+	function loginView() {
+	    return `
+		<h1> Sign in </h1>
+		<section class="card">
+		  <form id= "login-form" class="form-grid">
+		    <label class="field">Username
+		      <input name="username" required autocomplete="username">
+		    </label>
+		    <label class="field"> Password
+		      <input name="password" type="password" required autocomplete="current-password">
+		    </label>
+		    <div class="actions">
+		      <button class="btn primary" type="submit">Sign in</button>
+		    </div>
+		  </form>
+		</section>`;
+	}
 
         function userView() {
             if (checking) return scanView();
@@ -364,7 +388,21 @@
         const id = b.dataset.id;
         const med = byId(id);
         message = '';
-
+	
+	if (a === 'logout') {
+	  abandon();
+	  role = null;
+	  checking = null;
+	  helping = null;
+	  editing = null;
+	  sessionStorage.removeItem('carenest-role');
+	  notify('You have been logged out.');
+	  return;
+	}
+	
+	const caregiverOnly = ['add', 'edit', 'cancel-edit', 'delete', 'review', 'reply'];
+	if (caregiverOnly.includes(a) && role !== 'caregiver') return;
+	    
         if (a === 'take' && med && med.status !== 'Taken') {
             checking = { id, step: 1, wrong: false };
             render();
@@ -437,7 +475,20 @@
     });
 
     app.addEventListener('submit', e => {
-        if (e.target.id !== 'med-form') return;
+	if (e.target.id === 'login-form') {
+	  e.preventDefault();
+	  const {username, password } = Object.fromEntries(new FormData(e.target).entries());
+	  const account = ACCOUNTS[username.trim().toLowerCase()];
+	  if (account && account.password === password) {
+	    role = account.role;
+ 	    sessionStorage.setItem('carenest-role', role);
+	    notify(role === 'user' ? 'Welcome, Alex' : 'Signed in as caregiver.');
+	  } else {
+	    notify('Username or password is incorrect. Please try again');
+	  }
+	  return;
+    }
+        if (e.target.id !== 'med-form' || role !== 'caregiver') return;
         e.preventDefault();
         const values = Object.fromEntries(new FormData(e.target).entries());
         for (const k of ['name', 'dose', 'instructions', 'reminder']) values[k] = values[k].trim();
@@ -450,21 +501,6 @@
         editing = null;
         save();
         notify('Medication saved.');
-    });
-
-    document.getElementById('user-role').addEventListener('click', () => {
-        abandon();
-        role = 'user';
-        message = '';
-        render();
-    });
-
-    document.getElementById('caregiver-role').addEventListener('click', () => {
-        abandon();
-        role = 'caregiver';
-        editing = null;
-        message = '';
-        render();
     });
 
     document.getElementById('reset').addEventListener('click', () => {
