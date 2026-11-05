@@ -13,7 +13,7 @@
                     time: '08:00',
                     instructions: 'Check the label before taking your prescribed dose.',
                     reminder: 'Alex, it is time to check Demo Medicine A.',
-                    status: 'Due',
+                    status: 'Upcoming',
                     takenAt: ''
                 },
                 {
@@ -59,6 +59,47 @@
         const byId = id => data.medicines.find(m => m.id === id);
 
         const save = () => localStorage.setItem(KEY, JSON.stringify(data));
+	
+	const pad = n => String(n).padStart(2, '0');
+	const now = () => new Date(Date.now() + (data.clockOffset || 0));
+	const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+	const syncDay = () => {
+  	const current = now();
+  	const today = dateKey(current);
+  	const currentTime = `${pad(current.getHours())}:${pad(current.getMinutes())}`;
+
+  	// New day: reset every medicine
+  	if (data.lastDate && data.lastDate !== today) {
+    	  data.medicines.forEach(m => {
+      	    m.status = 'Upcoming';
+      	    m.takenAt = '';
+   	  });
+  	}
+  	data.lastDate = today;
+
+  	// Upcoming medicines become Due once their time arrives
+  	data.medicines.forEach(m => {
+    	if (m.status === 'Upcoming' && m.time <= currentTime) m.status = 'Due';
+  	});
+	
+  	save();
+	};
+
+	const skipHour = () => {
+ 	 data.clockOffset = (data.clockOffset || 0) + 60 * 60 * 1000;
+	};
+
+	const skipToNextDay = () => {
+	  const target = now();
+ 	 target.setDate(target.getDate() + 1);
+	  target.setHours(7, 0, 0, 0); // 7:00 AM, before the first dose
+	  data.clockOffset = target.getTime() - Date.now();
+	};	
+	
+	const backToToday = () => {
+  	  data.clockOffset = 0;
+	};	
 
         const timeLabel = t => {
         const [h, m] = t.split(':').map(Number);
@@ -109,6 +150,7 @@
         };
 
         function render() {
+	    syncDay();
 	    const notice = message ? `<div class="notice" role="status">${escapeHTML(message)}</div>` : '';
 	    if (!role) {
 	      document.getElementById('reset').hidden = true;
@@ -117,7 +159,13 @@
 	    }
             document.getElementById('reset').hidden = role !== 'caregiver';
 	    const logout = `<div class="actions">${button('Log out', 'logout')}</div>`;
-            app.innerHTML = notice + logout + (role === 'user' ? userView() : caregiverView());
+	    const demo = `<div class="actions">
+                <span class="muted">Demo time: ${escapeHTML(now().toLocaleString())}</span>
+                ${button('+1 hour', 'skip-hour', '', 'small-btn')}
+                ${button('Next day', 'next-day', '', 'small-btn')}
+		${button('Back to today', 'back-to-today', '', 'small-btn')}
+              </div>`;
+            app.innerHTML = notice + logout + demo + (role === 'user' ? userView() : caregiverView());
 	}
 
 	function loginView() {
@@ -399,6 +447,15 @@
 	  notify('You have been logged out.');
 	  return;
 	}
+	if (a === 'skip-hour' || a === 'next-day' || a === 'back-to-today') {
+ 	  if (a === 'skip-hour') skipHour();
+	  if (a === 'next-day') skipToNextDay();
+	  if (a === 'back-to-today') backToToday();
+   	  checking = null;
+  	  helping = null;
+  	  render();
+   	  return;
+	}
 	
 	const caregiverOnly = ['add', 'edit', 'cancel-edit', 'delete', 'review', 'reply'];
 	if (caregiverOnly.includes(a) && role !== 'caregiver') return;
@@ -414,7 +471,7 @@
             render();
         } else if (a === 'confirm' && med && checking?.step === 2 && checking.id === id) {
           med.status = 'Taken';
-          med.takenAt = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          med.takenAt = now().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
           checking = null;
           save();
           notify(`${med.name} marked Taken. The caregiver view is updated.`);
