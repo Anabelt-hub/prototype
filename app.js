@@ -28,6 +28,7 @@
                 }
             ],
             alerts: [],
+            history: [],
             reply: ''
         });
      
@@ -37,11 +38,14 @@
             data = saved && Array.isArray(saved.medicines) && Array.isArray(saved.alerts) ? saved : example();
         } catch {
           data = example();
-      }
+        }
  
+        data.history = data.history || [];
         let role = sessionStorage.getItem('carenest-role');
         let checking = null;
         let helping = null;
+        let completed = null;
+        let replyingTo = null;
         let editing = null;
         let message = '';
  
@@ -64,167 +68,210 @@
 	const now = () => new Date(Date.now() + (data.clockOffset || 0));
 	const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-	const syncDay = () => {
-  	const current = now();
-  	const today = dateKey(current);
-  	const currentTime = `${pad(current.getHours())}:${pad(current.getMinutes())}`;
+    const syncDay = () => {
+      const current = now();
+      const today = dateKey(current);
+      const currentTime = `${pad(current.getHours())}:${pad(current.getMinutes())}`;
+      const nowMins = current.getHours() * 60 + current.getMinutes();
 
-  	// New day: reset every medicine
-  	if (data.lastDate && data.lastDate !== today) {
-    	  data.medicines.forEach(m => {
-      	    m.status = 'Upcoming';
-      	    m.takenAt = '';
-   	  });
-  	}
-  	data.lastDate = today;
+      if (data.lastDate && data.lastDate !== today) {
+        data.medicines.forEach(m => {
+          m.status = 'Upcoming';
+          m.takenAt = '';
+          m.remindAt = null;
+        });
+      }
+      data.lastDate = today;
 
-  	// Upcoming medicines become Due once their time arrives
-  	data.medicines.forEach(m => {
-    	if (m.status === 'Upcoming' && m.time <= currentTime) m.status = 'Due';
-  	});
-	
-  	save();
-	};
+      data.medicines.forEach(m => {
+        const [h, min] = m.time.split(':').map(Number);
+        const minutesLate = nowMins - (h * 60 + min);
+
+        if (m.status === 'Upcoming' && m.time <= currentTime) m.status = 'Due';
+
+        if (m.status === 'Remind later' && m.remindAt && current.getTime() >= m.remindAt) {
+          m.status = 'Due';
+          m.remindAt = null;
+        }
+
+        if ((m.status === 'Due' || m.status === 'Remind later') && minutesLate >= 60) {
+          m.status = 'Unconfirmed';
+          m.remindAt = null;
+          alert(`${m.name} was not confirmed within an hour of ${timeLabel(m.time)}.`, 'med');
+        }
+      });
+
+      save();
+    };
 
 	const skipHour = () => {
- 	 data.clockOffset = (data.clockOffset || 0) + 60 * 60 * 1000;
+        data.clockOffset = (data.clockOffset || 0) + 60 * 60 * 1000;
 	};
 
 	const skipToNextDay = () => {
-	  const target = now();
- 	 target.setDate(target.getDate() + 1);
-	  target.setHours(7, 0, 0, 0); // 7:00 AM, before the first dose
-	  data.clockOffset = target.getTime() - Date.now();
+        const target = now();
+        target.setDate(target.getDate() + 1);
+        target.setHours(7, 0, 0, 0); // 7:00 AM, before the first dose
+        data.clockOffset = target.getTime() - Date.now();
 	};	
 	
 	const backToToday = () => {
-  	  data.clockOffset = 0;
+        data.clockOffset = 0;
 	};	
 
-        const timeLabel = t => {
+    const timeLabel = t => {
         const [h, m] = t.split(':').map(Number);
         return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-        };
+    };
 
-        const badge = status => {
-          const klass =
+    const badge = status => {
+        const klass =
             status === 'Taken' ? 'taken'
             : status === 'Due' ? 'due'
             : status === 'Unconfirmed' ? 'unconfirmed'
             : status === 'Remind later' ? 'later'
             : '';
-          const icon = { Taken: '✓', Due: '!', Unconfirmed: '✕', 'Remind later': '⏱', Upcoming: '•' }[status] || '';
-          return `<span class="status ${klass}"><span aria-hidden="true">${icon}</span> ${escapeHTML(status)}</span>`;
-        };
+        const icon = { Taken: '✓', Due: '!', Unconfirmed: '✕', 'Remind later': '⏱', Upcoming: '•' }[status] || '';
+        return `<span class="status ${klass}"><span aria-hidden="true">${icon}</span> ${escapeHTML(status)}</span>`;
+    };
 
-        const bottle = med =>
-        `<div class="bottle" role="img" aria-label="Illustration of a sample bottle labeled ${escapeHTML(med.name)}">
-          <div class="lid"></div>
-          <div class="body"><div class="label">${escapeHTML(med.name)}</div></div>
-        </div>`;
+    const bottle = med =>
+    `<div class="bottle" role="img" aria-label="Illustration of a sample bottle labeled ${escapeHTML(med.name)}">
+      <div class="lid"></div>
+      <div class="body"><div class="label">${escapeHTML(med.name)}</div></div>
+    </div>`;
 
-        const button = (text, action, id = '', klass = '') =>
-        `<button type="button" class="btn ${klass}" data-action="${action}" data-id="${escapeHTML(id)}">${text}</button>`;
+    const button = (text, action, id = '', klass = '') =>
+    `<button type="button" class="btn ${klass}" data-action="${action}" data-id="${escapeHTML(id)}">${text}</button>`;
 
-        const statusText = med =>
-        med.status === 'Taken' && med.takenAt ? `Confirmed at ${escapeHTML(med.takenAt)}` : med.status;
+    const statusText = med =>
+    med.status === 'Taken' && med.takenAt ? `Confirmed at ${escapeHTML(med.takenAt)}` : med.status;
 
         const rows = (meds, user = false) =>
         meds.map(m => `
           <div class="row">
             <div>
               <div class="row-title">${escapeHTML(m.name)}</div>
-              <div class="row-meta">${timeLabel(m.time)} · ${escapeHTML(m.dose)}</div>
+              <div class="row-meta">${timeLabel(m.time)} · ${escapeHTML(m.dose)}${m.status === 'Taken' && m.takenAt ? ' · Taken at ' + escapeHTML(m.takenAt) : ''}</div>
             </div>
             <div class="row-controls">
               ${badge(m.status)}
-              ${user && m.status !== 'Taken' ? button('Check', 'take', m.id, 'small-btn') : ''}
+              ${user ? button(m.status === 'Taken' ? 'Already taken' : 'Check', 'take', m.id, 'small-btn') : ''}
             </div>
           </div>`).join('');
 
-        const sortMeds = () => [...data.medicines].sort((a, b) => a.time.localeCompare(b.time));
+    const sortMeds = () => [...data.medicines].sort((a, b) => a.time.localeCompare(b.time));
 
-        const alert = (text, type) => {
-            data.alerts.unshift({ id: String(Date.now()) + Math.random(), text, type, reviewed: false });
-            save();
-        };
+    const alert = (text, type) => {
+        data.alerts.unshift({ id: String(Date.now()) + Math.random(), text, type, reviewed: false });
+        save();
+    };
 
-        function render() {
-	    syncDay();
-	    const notice = message ? `<div class="notice" role="status">${escapeHTML(message)}</div>` : '';
-	    if (!role) {
-	      document.getElementById('reset').hidden = true;
-	      app.innerHTML = notice + loginView();
-	      return;
-	    }
-            document.getElementById('reset').hidden = role !== 'caregiver';
-	    const logout = `<div class="actions">${button('Log out', 'logout')}</div>`;
-	    const demo = `<div class="actions">
-                <span class="muted">Demo time: ${escapeHTML(now().toLocaleString())}</span>
-                ${button('+1 hour', 'skip-hour', '', 'small-btn')}
-                ${button('Next day', 'next-day', '', 'small-btn')}
-		${button('Back to today', 'back-to-today', '', 'small-btn')}
-              </div>`;
-            app.innerHTML = notice + logout + demo + (role === 'user' ? userView() : caregiverView());
+    function render() {
+    syncDay();
+    const notice = message ? `<div class="notice" role="status">${escapeHTML(message)}</div>` : '';
+    if (!role) {
+      document.getElementById('reset').hidden = true;
+      app.innerHTML = notice + loginView();
+      return;
+    }
+        document.getElementById('reset').hidden = role !== 'caregiver';
+        const toolbar = `
+          <div class="toolbar">
+            <div class="toolbar-group">
+              <span class="demo-pill">DEMO</span>
+              <span class="muted">${escapeHTML(now().toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</span>
+            </div>
+            <div class="toolbar-group">
+              ${button('+1 hour', 'skip-hour', '', 'small-btn')}
+              ${button('Next day', 'next-day', '', 'small-btn')}
+              ${button('Today', 'back-to-today', '', 'small-btn')}
+              ${button('Log out', 'logout', '', 'small-btn')}
+            </div>
+          </div>`;
+            app.innerHTML = toolbar + notice + (role === 'user' ? userView() : caregiverView());
 	}
 
-	function loginView() {
-	    return `
-		<h1> Sign in </h1>
-		<section class="card">
-		  <form id= "login-form" class="form-grid">
-		    <label class="field">Username
-		      <input name="username" required autocomplete="username">
-		    </label>
-		    <label class="field"> Password
-		      <input name="password" type="password" required autocomplete="current-password">
-		    </label>
-		    <div class="actions">
-		      <button class="btn primary" type="submit">Sign in</button>
-		    </div>
-		  </form>
-		</section>`;
-	}
-
-        function userView() {
-            if (checking) return scanView();
-            if (helping !== null) return helpView();
-            const due = sortMeds().find(m => m.status !== 'Taken');
-            const latest = data.reply
-            ? `<div class="notice"><strong>Message from caregiver:</strong> ${escapeHTML(data.reply)}</div>`
-            : '';
-            
-            const nextCard = due
-            ? `<div class="medication">
-              ${bottle(due)}
-              <div class="med-info">
-                <div class="med-name">${escapeHTML(due.name)}</div>
-                <p class="dose"><strong>Dose:</strong> ${escapeHTML(due.dose)}</p>
-                <p><strong>Time:</strong> ${timeLabel(due.time)}</p>
-                ${badge(due.status)}
-              </div>
-            </div>
-            <p>${escapeHTML(due.instructions)}</p>
-            <div class="actions">
-              ${button('Take Medication', 'take', due.id, 'primary')}
-              ${due.status === 'Remind later' ? button('Show reminder now', 'show', due.id) : button('Remind Me Later', 'later', due.id)}
-              ${button('I Need Help', 'help', due.id)}
-            </div>
-            <div class="actions">${button('Play audio reminder', 'audio', due.id, 'small-btn')}</div>`
-            : '<p>You have confirmed every scheduled demo medicine. You can check today’s list below.</p>';
-            
+        function loginView() {
             return `
-              <h1>Hello, Alex</h1>
-              <p class="muted">Here is your medication reminder for today.</p>
-              ${latest}
-              <section class="card">
-                <h2>${due ? 'Your next medication' : 'All medications confirmed'}</h2>
-                ${nextCard}
-              </section>
-              <section class="card">
-                <h2>Today’s medication schedule</h2>
-                ${data.medicines.length ? rows(sortMeds(), true) : '<p>No medications have been added.</p>'}
-              </section>`;
+            <section class="login-card">
+              <div class="login-logo" aria-hidden="true">C</div>
+              <h1>Welcome to CareNest</h1>
+              <p class="muted">Simple medication reminders, with support from the people who care for you.</p>
+              <form id="login-form" class="form-grid">
+                <label class="field">Username
+                  <input name="username" required autocomplete="username" placeholder="e.g. alex">
+                </label>
+                <label class="field">Password
+                  <input name="password" type="password" required autocomplete="current-password" placeholder="Enter your password">
+                </label>
+                <button class="btn primary login-btn" type="submit">Sign in</button>
+              </form>
+              <div class="login-demo">
+                <strong>Demo accounts</strong>
+                <span><code>alex</code> — medication user</span>
+                <span><code>caregiver</code> — caregiver dashboard</span>
+                <span>Password for both: <code>test123</code></span>
+              </div>
+            </section>`;
+        }
+
+    function userView() {
+        if (checking) return scanView();
+        if (completed) return successView();
+        if (helping !== null) return helpView();
+        const due = sortMeds().find(m => m.status !== 'Taken');
+        const latest = data.reply
+        ? `<div class="notice"><strong>Message from caregiver:</strong> ${escapeHTML(data.reply)}
+            <div class="actions">${button('Got it', 'dismiss-reply', '', 'small-btn')}</div></div>`
+        : '';
+        
+        const nextCard = due
+        ? `<div class="medication">
+          ${bottle(due)}
+          <div class="med-info">
+            <div class="med-name">${escapeHTML(due.name)}</div>
+            <p class="dose"><strong>Dose:</strong> ${escapeHTML(due.dose)}</p>
+            <p><strong>Time:</strong> ${timeLabel(due.time)}</p>
+            ${badge(due.status)}
+          </div>
+        </div>
+        <p>${escapeHTML(due.instructions)}</p>
+        <div class="actions">
+          ${button('Take Medication', 'take', due.id, 'primary')}
+          ${due.status === 'Remind later' ? button('Show reminder now', 'show', due.id) : button('Remind Me Later', 'later', due.id)}
+          ${button('I Need Help', 'help', due.id)}
+        </div>
+        <div class="actions">${button('Play audio reminder', 'audio', due.id, 'small-btn')}</div>`
+        : '<p>You have confirmed every scheduled demo medicine. You can check today’s list below.</p>';
+        const takenCount = data.medicines.filter(m => m.status === 'Taken').length;
+        const total = data.medicines.length;
+        const percent = total ? Math.round((takenCount / total) * 100) : 0;
+        const progress = total ? `
+          <div class="progress-wrap">
+            <div class="progress-text"><strong>${takenCount} of ${total}</strong> medications taken today</div>
+            <div class="progress" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-fill" style="width: ${percent}%"></div>
+            </div>
+          </div>` : '';
+        const banner = due && (due.status === 'Due' || due.status === 'Unconfirmed')
+        ? `<div class="notice due-banner" role="alert"><strong> It is time for ${escapeHTML(due.name)}.</strong> Press “Take Medication” when you are ready.</div>`
+        : '';
+        
+        return `
+          <h1>Hello, Alex</h1>
+            <p class="muted">Here is your medication reminder for today.</p>
+            ${banner}
+            ${progress}
+            ${latest}
+          <section class="card">
+            <h2>${due ? 'Your next medication' : 'All medications confirmed'}</h2>
+            ${nextCard}
+          </section>
+          <section class="card">
+            <h2>Today’s medication schedule</h2>
+            ${data.medicines.length ? rows(sortMeds(), true) : '<p>No medications have been added.</p>'}
+          </section>`;
         }
 
         function scanView() {
@@ -255,6 +302,7 @@
                     ? `<div role="alert" class="notice warning">
                         <strong>STOP — this is the wrong bottle.</strong>
                         <p>Do not take it. Find the bottle shown above or ask your caregiver for help.</p>
+                        <p class="small">Wrong bottle attempts: ${checking.wrongCount}</p>
                             </div>`
                     : ''}
                   <div class="actions">
@@ -298,6 +346,19 @@
                   <div class="actions">${button('Back', 'help-back')}</div>
                 </section>`;
         }
+        
+        function successView() {
+            const med = byId(completed);
+            const next = sortMeds().find(m => m.status !== 'Taken');
+            return `
+              <section class="card success-card">
+                <div class="success-icon" aria-hidden="true">✓</div>
+                <h1>Medication taken</h1>
+                ${med ? `<p><strong>${escapeHTML(med.name)}</strong> · ${escapeHTML(med.dose)}<br>Confirmed at ${escapeHTML(med.takenAt)}</p>` : ''}
+                <p class="muted">${next ? `Next: ${escapeHTML(next.name)} at ${timeLabel(next.time)}` : 'No more medications today.'}</p>
+                <div class="actions success-actions">${button('Done', 'done', '', 'primary')}</div>
+              </section>`;
+        }
 
         function caregiverView() {
             const meds = sortMeds();
@@ -330,22 +391,41 @@
               ${button('Reply', 'reply', a.id, 'small-btn')}
               ${button('Reviewed', 'review', a.id, 'small-btn')}
             </div>
+            ${replyingTo === a.id ? `
+            <form id="reply-form" class="form-grid reply-form" data-id="${escapeHTML(a.id)}">
+              <label class="field">Message to Alex
+                <textarea name="reply" required maxlength="200">I saw your request. I will help you.</textarea>
+              </label>
+              <div class="actions">
+                <button class="btn primary" type="submit">Send message</button>
+                ${button('Cancel', 'cancel-reply')}
+              </div>
+            </form>` : ''}
           </div>`).join('')
             : '<p>No new alerts.</p>';
             
-            const takenMeds = meds.filter(m => m.status === 'Taken');
-            const historyRows = takenMeds.length
-            ? takenMeds.map(m => `<p>${escapeHTML(m.name)} — ${escapeHTML(m.takenAt)}</p>`).join('')
+            const historyRows = data.history.length
+            ? data.history.slice(0, 15).map(h => `
+          <div class="row">
+            <div>
+              <div class="row-title">${escapeHTML(h.name)}</div>
+              <div class="row-meta">${escapeHTML(h.dose)} · ${escapeHTML(h.date)} at ${escapeHTML(h.at)}</div>
+            </div>
+            ${badge('Taken')}
+          </div>`).join('')
             : '<p>No doses have been confirmed yet.</p>';
             
             return `
               <h1>Caregiver dashboard</h1>
               <p class="muted">Alex's medication schedule and requests for help.</p>
-              <div class="counts">
-                <div class="count"><strong>${taken}</strong>Taken</div>
-                <div class="count"><strong>${meds.length - taken - unconfirmed}</strong>Upcoming / due</div>
-                <div class="count"><strong>${unconfirmed}</strong>Unconfirmed</div>
-              </div>
+                <div class="counts">
+                  <div class="count count-good"><strong>${taken}</strong>Taken</div>
+                  <div class="count"><strong>${meds.length - taken - unconfirmed}</strong>Upcoming / due</div>
+                  <div class="count ${unconfirmed ? 'count-alert' : ''}"><strong>${unconfirmed}</strong>Missed / unconfirmed</div>
+                </div>
+                ${pendingAlerts.length
+                  ? `<div class="notice warning" role="alert"><strong>⚠️ ${pendingAlerts.length} ${pendingAlerts.length === 1 ? 'item needs' : 'items need'} your attention.</strong> See “Help requests and alerts” below.</div>`
+                  : `<div class="notice success"><strong>✓ Everything is on track.</strong> No new alerts.</div>`}
               <section class="card">
                 <h2>Medication status</h2>
                 ${statusRows}
@@ -442,6 +522,7 @@
 	  role = null;
 	  checking = null;
 	  helping = null;
+    completed = null;
 	  editing = null;
 	  sessionStorage.removeItem('carenest-role');
 	  notify('You have been logged out.');
@@ -457,31 +538,47 @@
    	  return;
 	}
 	
-	const caregiverOnly = ['add', 'edit', 'cancel-edit', 'delete', 'review', 'reply'];
+    const caregiverOnly = ['add', 'edit', 'cancel-edit', 'delete', 'review', 'reply', 'cancel-reply'];
 	if (caregiverOnly.includes(a) && role !== 'caregiver') return;
+        
+        if (a === 'take' && med && med.status === 'Taken') {
+          notify(`You already took ${med.name} today at ${med.takenAt}. Do not take it again.`);
+          return;
+        }
 	    
         if (a === 'take' && med && med.status !== 'Taken') {
-            checking = { id, step: 1, wrong: false };
+            checking = { id, step: 1, wrong: false, wrongCount: 0 };
             render();
         } else if (a === 'correct' && checking) {
             checking.step = 2;
             render();
         } else if (a === 'wrong' && checking) {
             checking.wrong = true;
+            checking.wrongCount += 1;
+            if (checking.wrongCount === 2) {
+              alert(`Alex picked the wrong bottle twice while looking for ${byId(checking.id).name}.`, 'help');
+            }
             render();
         } else if (a === 'confirm' && med && checking?.step === 2 && checking.id === id) {
-          med.status = 'Taken';
-          med.takenAt = now().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-          checking = null;
-          save();
-          notify(`${med.name} marked Taken. The caregiver view is updated.`);
+            med.status = 'Taken';
+            med.takenAt = now().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            data.history.unshift({ name: med.name, dose: med.dose, at: med.takenAt, date: now().toLocaleDateString() });
+            checking = null;
+            completed = id;
+            save();
+            render();
+            window.scrollTo(0, 0);
+        } else if (a === 'done') {
+            completed = null;
+            render();
         } else if (a === 'cancel') {
-          abandon();
-          notify('Dose not confirmed. Your caregiver can see this status.');
+            abandon();
+            notify('Dose not confirmed. Your caregiver can see this status.');
         } else if (a === 'later' && med) {
-          med.status = 'Remind later';
-          save();
-          notify('Reminder delayed. This dose is not marked Taken. Select “Show reminder now” when ready.');
+            med.status = 'Remind later';
+            med.remindAt = now().getTime() + 15 * 60 * 1000;
+            save();
+            notify('Okay, I will remind you again in 15 minutes. This dose is not marked Taken.');
         } else if (a === 'show' && med) {
           med.status = 'Due';
           save();
@@ -523,28 +620,44 @@
             notify('Alert marked reviewed.');
           }
         } else if (a === 'reply') {
-          data.reply = 'I saw your request. I will help you.';
-          const found = data.alerts.find(al => al.id === id);
-          if (found) found.reviewed = true;
+          replyingTo = id;
+          render();
+        } else if (a === 'cancel-reply') {
+          replyingTo = null;
+          render();
+        } else if (a === 'dismiss-reply') {
+          data.reply = '';
           save();
-          notify('A reassurance message is now visible in Alex’s view.');
+          render();
         }
     });
 
     app.addEventListener('submit', e => {
-	if (e.target.id === 'login-form') {
-	  e.preventDefault();
-	  const {username, password } = Object.fromEntries(new FormData(e.target).entries());
-	  const account = ACCOUNTS[username.trim().toLowerCase()];
-	  if (account && account.password === password) {
-	    role = account.role;
- 	    sessionStorage.setItem('carenest-role', role);
-	    notify(role === 'user' ? 'Welcome, Alex' : 'Signed in as caregiver.');
-	  } else {
-	    notify('Username or password is incorrect. Please try again');
-	  }
-	  return;
-    }
+        if (e.target.id === 'reply-form') {
+          e.preventDefault();
+          const text = e.target.elements.reply.value.trim();
+          if (!text) return;
+          data.reply = text;
+          const found = data.alerts.find(al => al.id === e.target.dataset.id);
+          if (found) found.reviewed = true;
+          replyingTo = null;
+          save();
+          notify('Your message is now visible in Alex’s view.');
+          return;
+        }
+        if (e.target.id === 'login-form') {
+          e.preventDefault();
+          const {username, password } = Object.fromEntries(new FormData(e.target).entries());
+          const account = ACCOUNTS[username.trim().toLowerCase()];
+          if (account && account.password === password) {
+            role = account.role;
+            sessionStorage.setItem('carenest-role', role);
+            notify(role === 'user' ? 'Welcome, Alex' : 'Signed in as caregiver.');
+          } else {
+            notify('Username or password is incorrect. Please try again');
+          }
+          return;
+        }
         if (e.target.id !== 'med-form' || role !== 'caregiver') return;
         e.preventDefault();
         const values = Object.fromEntries(new FormData(e.target).entries());

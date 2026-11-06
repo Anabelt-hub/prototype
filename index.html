@@ -3,14 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <title>CareNest — Medication Reminder Prototype</title>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="site-header">
-    <div><strong class="brand">CareNest</strong><span class="caption">Medication reminder prototype</span></div>
-  </header>
+    <header class="site-header">
+      <div class="brand-wrap">
+        <div class="logo" aria-hidden="true">C</div>
+        <div>
+          <strong class="brand">CareNest</strong>
+          <span class="caption">Medication reminders</span>
+        </div>
+      </div>
+    </header>
   <main id="app" class="app" aria-live="off"></main>
   <footer class="footer">Carenest <button id="reset" type="button" class="link-button">Reset demo</button></footer>
 </body>
